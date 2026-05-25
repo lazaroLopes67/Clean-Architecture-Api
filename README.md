@@ -343,12 +343,13 @@ Example:
   "DefaultConnection": "server=localhost;database=ApiDB;user=root;password=yourpassword"
 }
 ```
-
+## Initialize the application after adding the connection string at least once.
 ---
 
 ## Apply migrations
 
 ```bash
+dotnet ef migrations add InitialMigration
 dotnet ef database update
 ```
 
