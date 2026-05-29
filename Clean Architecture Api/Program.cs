@@ -1,4 +1,5 @@
 using Criando_Minha_Primeira_API.Context;
+using Criando_Minha_Primeira_API.DTOs.Mapping;
 using Criando_Minha_Primeira_API.Extension;
 using Criando_Minha_Primeira_API.Logging;
 using Criando_Minha_Primeira_API.UnitOfWork;
@@ -28,6 +29,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Logging.AddProvider(new LoggingProvider(builder.Configuration));
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 var app = builder.Build();
 

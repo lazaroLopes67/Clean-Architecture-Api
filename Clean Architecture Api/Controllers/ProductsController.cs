@@ -1,121 +1,218 @@
-﻿using Criando_Minha_Primeira_API.Model;
-using Criando_Minha_Primeira_API.Model.Interfaces;
+﻿using AutoMapper;
+using Criando_Minha_Primeira_API.DTOs;
+using Criando_Minha_Primeira_API.Model;
 using Criando_Minha_Primeira_API.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Criando_Minha_Primeira_API.Controllers
 {
     /// <summary>
-    /// API controller responsible for managing Procuct resources.
-    /// Provides endpoints for CRUD operations using Unit of Work pattern.
+    /// API controller responsible for managing product resources.
+    /// 
+    /// This controller exposes CRUD endpoints for products
+    /// and uses DTOs to control the data exposed to API clients.
     /// </summary>
     [ApiController]
     [Route("[controller]")]
     public class ProductsController : ControllerBase
     {
         /// <summary>
-        /// Unit of Work instance used to access repositories and commit changes.
+        /// Unit of Work instance used to access repositories
+        /// and persist changes to the database.
         /// </summary>
         private readonly IUnitOfWork _uof;
 
         /// <summary>
-        /// Initializes a new instance of the ProductsController.
+        /// AutoMapper instance responsible for converting
+        /// entities into DTOs and DTOs into entities.
         /// </summary>
-        /// <param name="uof">Unit of Work injected via dependency injection.</param>
-        public ProductsController(IUnitOfWork uof)
+        private readonly IMapper _mapper;
+
+        /// <summary>
+        /// Initializes a new instance of the ProductsController class.
+        /// 
+        /// Dependencies are automatically injected by ASP.NET Core's
+        /// built-in dependency injection container.
+        /// </summary>
+        /// <param name="uof">
+        /// Unit of Work implementation used to manage repositories
+        /// and database transactions.
+        /// </param>
+        /// <param name="mapper">
+        /// AutoMapper instance used for object-object mapping.
+        /// </param>
+        public ProductsController(IUnitOfWork uof, IMapper mapper)
         {
             _uof = uof;
+            _mapper = mapper;
         }
+
         /// <summary>
-        /// Retrieves all products ordered by Id.
+        /// Retrieves all products ordered by their Id.
+        /// 
+        /// The retrieved entities are mapped to ProductDto objects
+        /// before being returned to the client.
         /// </summary>
-        /// <returns>A list of product or 404 if none are found.</returns>
-        [HttpGet(Name = "GetAllProcts")]
-        public ActionResult<IEnumerable<Product>> Get()
+        /// <returns>
+        /// A collection of ProductDto objects or
+        /// HTTP 404 if no products are found.
+        /// </returns>
+        [HttpGet(Name = "GetAllProducts")]
+        public ActionResult<IEnumerable<ProductDto>> Get()
         {
-            var items = _uof.RepositoryProducts
+            // Retrieves all products from the repository
+            var products = _uof.RepositoryProducts
                              .GetAll()
                              .OrderBy(p => p.Id)
                              .ToList();
 
-            if (items is null || items.Count == 0)
+            // Returns HTTP 404 if no products exist
+            if (products.Count == 0)
             {
                 return NotFound("No product was found.");
             }
 
-            return Ok(items);
+            // Maps Product entities to ProductDto objects
+            var productsDto = _mapper.Map<IEnumerable<ProductDto>>(products);
+
+            return Ok(productsDto);
         }
+
         /// <summary>
         /// Retrieves a product by its unique identifier.
         /// </summary>
-        /// <param name="id">Product identifier.</param>
-        /// <returns>The product if found; otherwise, 404 Not Found.</returns>
+        /// <param name="id">
+        /// Unique identifier of the product.
+        /// </param>
+        /// <returns>
+        /// Returns the requested ProductDto if found;
+        /// otherwise HTTP 404 Not Found.
+        /// </returns>
         [HttpGet("{id:int:min(1)}", Name = "GetProductById")]
-        public ActionResult<Product> Get([FromRoute] int id)
+        public ActionResult<ProductDto> Get([FromRoute] int id)
         {
-            var item = _uof.RepositoryProducts.Get(p => p.Id == id);
+            // Searches for the product using the provided identifier
+            var product = _uof.RepositoryProducts.Get(p => p.Id == id);
 
-            if (item is null)
+            // Returns HTTP 404 if the product does not exist
+            if (product is null)
             {
                 return NotFound($"Product with Id={id} not found");
             }
 
-            return Ok(item);
+            // Maps the Product entity to ProductDto
+            var productDto = _mapper.Map<ProductDto>(product);
+
+            return Ok(productDto);
         }
 
         /// <summary>
-        /// Creates a new product in the database.
+        /// Creates a new product resource.
         /// </summary>
-        /// <param name="category">Product object sent in the request body.</param>
-        /// <returns>The created product with its generated Id.</returns>
+        /// <param name="productDto">
+        /// ProductDto object received from the request body.
+        /// 
+        /// This DTO contains the data required to create
+        /// a new product resource.
+        /// </param>
+        /// <returns>
+        /// Returns the created ProductDto with HTTP 201 Created status.
+        /// </returns>
         [HttpPost(Name = "CreateProduct")]
-        public ActionResult<Product> Add([FromBody] Product product)
+        public ActionResult<ProductDto> Add([FromBody] ProductDto productDto)
         {
-            var created_product = _uof.RepositoryProducts.Add(product);
+            // Creates a new Product entity based on the ProductDto
+            var product = _mapper.Map<Product>(productDto);
+
+            // Adds the new product to the repository
+            var createdProduct = _uof.RepositoryProducts.Add(product);
+
+            // Persists changes to the database
             _uof.Commit();
+
+            // Maps the created entity to ProductDto
+            var createdProductDto = _mapper.Map<ProductDto>(createdProduct);
+
+            // Returns HTTP 201 Created with the route
+            // to retrieve the newly created resource
             return new CreatedAtRouteResult(
                 "GetProductById",
-                new { id = created_product.Id },
-                created_product
+                new { id = createdProductDto.Id },
+                createdProductDto
             );
         }
 
         /// <summary>
-        /// Updates an existing product.
+        /// Updates an existing product resource.
         /// </summary>
-        /// <param name="id">Product Id from the route.</param>
-        /// <param name="category">Updated product data.</param>
-        /// <returns>The updated product.</returns>
+        /// <param name="id">
+        /// Unique identifier of the product received from the route.
+        /// </param>
+        /// <param name="productDto">
+        /// ProductDto object containing the updated
+        /// product data received from the request body.
+        /// </param>
+        /// <returns>
+        /// Returns the updated ProductDto or HTTP 400 Bad Request
+        /// if the route Id does not match the DTO Id.
+        /// </returns>
         [HttpPut("{id:int:min(1)}", Name = "UpdateProduct")]
-        public ActionResult<Product> Update(int id, [FromBody] Product product)
+        public ActionResult<ProductDto> Update(int id, [FromBody] ProductDto productDto)
         {
-            if (id != product.Id)
+            // Validates whether the route Id matches
+            // the DTO identifier
+            if (id != productDto.Id)
+            {
                 return BadRequest("The ID in the URL is different from the product ID");
+            }
 
-            var updated_product = _uof.RepositoryProducts.Update(product);
+            // Creates a Product entity based on the ProductDto
+            var product = _mapper.Map<Product>(productDto);
+
+            // Updates the product entity
+            var updatedProduct = _uof.RepositoryProducts.Update(product);
+
+            // Persists changes to the database
             _uof.Commit();
 
-            return Ok(updated_product);
+            // Maps the updated entity to ProductDto
+            var updatedProductDto = _mapper.Map<ProductDto>(updatedProduct);
+
+            return Ok(updatedProductDto);
         }
 
         /// <summary>
-        /// Deletes a Product by its Id.
+        /// Deletes a product resource by its identifier.
         /// </summary>
-        /// <param name="id">Product identifier.</param>
-        /// <returns>The deleted product or 404 if not found.</returns>
+        /// <param name="id">
+        /// Unique identifier of the product.
+        /// </param>
+        /// <returns>
+        /// Returns the deleted ProductDto if the product exists;
+        /// otherwise HTTP 404 Not Found.
+        /// </returns>
         [HttpDelete("{id:int:min(1)}")]
-        public ActionResult<Product> Delete(int id)
+        public ActionResult<ProductDto> Delete(int id)
         {
-            var product = _uof.RepositoryCategory.Get(P => P.Id == id);
+            // Searches for the product before deletion
+            var product = _uof.RepositoryProducts.Get(p => p.Id == id);
 
-            if (product is not null)
+            // Returns HTTP 404 if the product does not exist
+            if (product is null)
             {
-                var deleted_product = _uof.RepositoryCategory.Delete(product);
-                _uof.Commit();
-                return Ok(deleted_product);
+                return NotFound($"Product with Id={id} not found");
             }
 
-            return NotFound($"Product with Id={id} not found");
+            // Removes the product from the repository
+            var deletedProduct = _uof.RepositoryProducts.Delete(product);
+
+            // Persists changes to the database
+            _uof.Commit();
+
+            // Maps the deleted entity to ProductDto
+            var deletedProductDto = _mapper.Map<ProductDto>(deletedProduct);
+
+            return Ok(deletedProductDto);
         }
     }
 }

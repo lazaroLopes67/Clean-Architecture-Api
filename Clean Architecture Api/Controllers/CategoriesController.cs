@@ -1,3 +1,5 @@
+using AutoMapper;
+using Criando_Minha_Primeira_API.DTOs;
 using Criando_Minha_Primeira_API.Model;
 using Criando_Minha_Primeira_API.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
@@ -5,117 +7,212 @@ using Microsoft.AspNetCore.Mvc;
 namespace Criando_Minha_Primeira_API.Controllers
 {
     /// <summary>
-    /// API controller responsible for managing Category resources.
-    /// Provides endpoints for CRUD operations using Unit of Work pattern.
+    /// API controller responsible for managing category resources.
+    /// 
+    /// This controller exposes CRUD endpoints for categories
+    /// and uses DTOs to control the data exposed to API clients.
     /// </summary>
     [ApiController]
     [Route("[controller]")]
     public class CategoriesController : ControllerBase
     {
         /// <summary>
-        /// Unit of Work instance used to access repositories and commit changes.
+        /// Unit of Work instance used to access repositories
+        /// and persist changes to the database.
         /// </summary>
         private readonly IUnitOfWork _uof;
 
         /// <summary>
-        /// Initializes a new instance of the CategoriesController.
+        /// AutoMapper instance responsible for converting
+        /// entities into DTOs and DTOs into entities.
         /// </summary>
-        /// <param name="uof">Unit of Work injected via dependency injection.</param>
-        public CategoriesController(IUnitOfWork uof)
+        private readonly IMapper _mapper;
+
+        /// <summary>
+        /// Initializes a new instance of the CategoriesController class.
+        /// 
+        /// Dependencies are automatically injected by ASP.NET Core's
+        /// built-in dependency injection container.
+        /// </summary>
+        /// <param name="uof">
+        /// Unit of Work implementation used to manage repositories
+        /// and database transactions.
+        /// </param>
+        /// <param name="mapper">
+        /// AutoMapper instance used for object-object mapping.
+        /// </param>
+        public CategoriesController(IUnitOfWork uof, IMapper mapper)
         {
             _uof = uof;
+            _mapper = mapper;
         }
+
         /// <summary>
-        /// Retrieves all categories ordered by Id.
+        /// Retrieves all categories ordered by their Id.
+        /// 
+        /// The retrieved entities are mapped to CategoryDto objects
+        /// before being returned to the client.
         /// </summary>
-        /// <returns>A list of categories or 404 if none are found.</returns>
+        /// <returns>
+        /// A collection of CategoryDto objects or
+        /// HTTP 404 if no categories are found.
+        /// </returns>
         [HttpGet(Name = "GetAllCategories")]
-        public ActionResult<IEnumerable<Category>> Get()
+        public ActionResult<IEnumerable<CategoryDto>> Get()
         {
-            var items = _uof.RepositoryCategory
+            // Retrieves all categories from the repository
+            var categories = _uof.RepositoryCategory
                              .GetAll()
                              .OrderBy(c => c.Id)
                              .ToList();
 
-            if (items is null || items.Count == 0)
+            // Returns HTTP 404 if no categories exist
+            if (categories.Count == 0)
             {
                 return NotFound("No category was found.");
             }
 
-            return Ok(items);
+            // Maps Category entities to CategoryDto objects
+            var categoriesDto = _mapper.Map<IEnumerable<CategoryDto>>(categories);
+
+            return Ok(categoriesDto);
         }
+
         /// <summary>
         /// Retrieves a category by its unique identifier.
         /// </summary>
-        /// <param name="id">Category identifier.</param>
-        /// <returns>The category if found; otherwise, 404 Not Found.</returns>
+        /// <param name="id">
+        /// Unique identifier of the category.
+        /// </param>
+        /// <returns>
+        /// Returns the requested CategoryDto if found;
+        /// otherwise HTTP 404 Not Found.
+        /// </returns>
         [HttpGet("{id:int:min(1)}", Name = "GetCategoryById")]
-        public ActionResult<Category> Get([FromRoute] int id)
+        public ActionResult<CategoryDto> Get([FromRoute] int id)
         {
-            var item = _uof.RepositoryCategory.Get(c => c.Id == id);
+            // Searches for the category using the provided identifier
+            var category = _uof.RepositoryCategory.Get(c => c.Id == id);
 
-            if (item is null)
+            // Returns HTTP 404 if the category does not exist
+            if (category is null)
             {
                 return NotFound($"Category with Id={id} not found");
             }
 
-            return Ok(item);
+            // Maps the Category entity to CategoryDto
+            var categoryDto = _mapper.Map<CategoryDto>(category);
+
+            return Ok(categoryDto);
         }
 
         /// <summary>
-        /// Creates a new category in the database.
+        /// Creates a new category resource.
         /// </summary>
-        /// <param name="category">Category object sent in the request body.</param>
-        /// <returns>The created category with its generated Id.</returns>
+        /// <param name="categoryDto">
+        /// CategoryDto object received from the request body.
+        /// 
+        /// This DTO contains the data required to create
+        /// a new category resource.
+        /// </param>
+        /// <returns>
+        /// Returns the created CategoryDto with HTTP 201 Created status.
+        /// </returns>
         [HttpPost(Name = "CreateCategory")]
-        public ActionResult<Category> Add([FromBody] Category category)
+        public ActionResult<CategoryDto> Add([FromBody] CategoryDto categoryDto)
         {
-            var created_category = _uof.RepositoryCategory.Add(category);
+            // Creates a new Category entity based on the CategoryDto
+            var category = _mapper.Map<Category>(categoryDto);
+
+            // Adds the new category to the repository
+            var createdCategory = _uof.RepositoryCategory.Add(category);
+
+            // Persists changes to the database
             _uof.Commit();
 
+            // Maps the created entity to CategoryDto
+            var createdCategoryDto = _mapper.Map<CategoryDto>(createdCategory);
+
+            // Returns HTTP 201 Created with the route
+            // to retrieve the newly created resource
             return new CreatedAtRouteResult(
                 "GetCategoryById",
-                new { id = created_category.Id },
-                created_category
+                new { id = createdCategoryDto.Id },
+                createdCategoryDto
             );
         }
 
         /// <summary>
-        /// Updates an existing category.
+        /// Updates an existing category resource.
         /// </summary>
-        /// <param name="id">Category Id from the route.</param>
-        /// <param name="category">Updated category data.</param>
-        /// <returns>The updated category.</returns>
+        /// <param name="id">
+        /// Unique identifier of the category received from the route.
+        /// </param>
+        /// <param name="categoryDto">
+        /// CategoryDto object containing the updated
+        /// category data received from the request body.
+        /// </param>
+        /// <returns>
+        /// Returns the updated CategoryDto or HTTP 400 Bad Request
+        /// if the route Id does not match the DTO Id.
+        /// </returns>
         [HttpPut("{id:int:min(1)}", Name = "UpdateCategory")]
-        public ActionResult<Category> Update(int id, [FromBody] Category category)
+        public ActionResult<CategoryDto> Update(int id, [FromBody] CategoryDto categoryDto)
         {
-            if (id != category.Id)
+            // Validates whether the route Id matches
+            // the DTO identifier
+            if (id != categoryDto.Id)
+            {
                 return BadRequest("The ID in the URL is different from the category ID");
+            }
 
-            var updated_category = _uof.RepositoryCategory.Update(category);
+            // Creates a Category entity based on the CategoryDto
+            var category = _mapper.Map<Category>(categoryDto);
+
+            // Updates the category entity
+            var updatedCategory = _uof.RepositoryCategory.Update(category);
+
+            // Persists changes to the database
             _uof.Commit();
 
-            return Ok(updated_category);
+            // Maps the updated entity to CategoryDto
+            var updatedCategoryDto = _mapper.Map<CategoryDto>(updatedCategory);
+
+            return Ok(updatedCategoryDto);
         }
 
         /// <summary>
-        /// Deletes a category by its Id.
+        /// Deletes a category resource by its identifier.
         /// </summary>
-        /// <param name="id">Category identifier.</param>
-        /// <returns>The deleted category or 404 if not found.</returns>
+        /// <param name="id">
+        /// Unique identifier of the category.
+        /// </param>
+        /// <returns>
+        /// Returns the deleted CategoryDto if the category exists;
+        /// otherwise HTTP 404 Not Found.
+        /// </returns>
         [HttpDelete("{id:int:min(1)}")]
-        public ActionResult<Category> Delete(int id)
+        public ActionResult<CategoryDto> Delete(int id)
         {
+            // Searches for the category before deletion
             var category = _uof.RepositoryCategory.Get(c => c.Id == id);
 
-            if (category is not null)
+            // Returns HTTP 404 if the category does not exist
+            if (category is null)
             {
-                var deleted_category = _uof.RepositoryCategory.Delete(category);
-                _uof.Commit();
-                return Ok(deleted_category);
+                return NotFound($"Category with Id={id} not found");
             }
 
-            return NotFound($"Category with Id={id} not found");
+            // Removes the category from the repository
+            var deletedCategory = _uof.RepositoryCategory.Delete(category);
+
+            // Persists changes to the database
+            _uof.Commit();
+
+            // Maps the deleted entity to CategoryDto
+            var deletedCategoryDto = _mapper.Map<CategoryDto>(deletedCategory);
+
+            return Ok(deletedCategoryDto);
         }
     }
 }
