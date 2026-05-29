@@ -112,28 +112,22 @@ namespace Criando_Minha_Primeira_API.Controllers
         /// Retrieves products using pagination.
         /// 
         /// Pagination parameters are received through the query string,
-        /// allowing clients to define the current page number
-        /// and the number of items returned per page.
+        /// allowing clients to define:
+        /// 
+        /// - The current page number
+        /// - The number of items returned per page
         /// 
         /// Example:
         /// GET /products?pageNumber=1&pageSize=10
         /// </summary>
         /// <param name="queryParams">
-        /// Object containing pagination parameters received from the URL query string.
-        /// 
-        /// PageNumber:
-        /// Defines which page should be returned.
-        /// 
-        /// PageSize:
-        /// Defines how many records should be returned per page.
+        /// Object containing pagination parameters received from the query string.
         /// </param>
         /// <returns>
-        /// A paginated collection of ProductDto objects.
-        /// 
-        /// Pagination metadata is also included in the response headers
-        /// using the custom "X-Pagination" header.
+        /// A paginated collection of ProductDto objects
+        /// including pagination metadata in the response headers.
         /// </returns>
-        [HttpGet("pagination", Name = "PaginationProducts")]
+        [HttpGet]
         public ActionResult<IEnumerable<ProductDto>> Pagination([FromQuery] QueryParams queryParams)
         {
             // Retrieves all products ordered by Id
@@ -149,11 +143,30 @@ namespace Criando_Minha_Primeira_API.Controllers
                 queryParams.PageSize
             );
 
-            // Maps Product entities to ProductDto objects
-            var pagedListDto = _mapper.Map<IEnumerable<ProductDto>>(pagedList);
+            // Sends pagination metadata in the response header
+            // and returns the paginated DTO collection
+            return AddPaginationHeader(pagedList);
+        }
 
-            // Creates pagination metadata object
-            // to provide additional information to the client
+        /// <summary>
+        /// Adds pagination metadata to the HTTP response headers
+        /// and returns the paginated DTO collection.
+        /// 
+        /// The metadata is serialized as JSON and stored
+        /// in the custom "X-Pagination" response header.
+        /// </summary>
+        /// <param name="pagedList">
+        /// Paginated collection containing Product entities
+        /// and pagination metadata.
+        /// </param>
+        /// <returns>
+        /// A paginated collection of ProductDto objects.
+        /// </returns>
+        private ActionResult<IEnumerable<ProductDto>> AddPaginationHeader(
+            PagedList<Product> pagedList)
+        {
+            // Creates an anonymous object containing
+            // pagination metadata information
             var metadata = new
             {
                 // Current page being returned
@@ -182,8 +195,50 @@ namespace Criando_Minha_Primeira_API.Controllers
                 JsonSerializer.Serialize(metadata)
             );
 
+            // Maps Product entities to ProductDto objects
+            var pagedListDto =
+                _mapper.Map<IEnumerable<ProductDto>>(pagedList);
+
             // Returns the paginated DTO collection
             return Ok(pagedListDto);
+        }
+
+        /// <summary>
+        /// Retrieves products filtered by price
+        /// using pagination.
+        /// 
+        /// Clients can filter products using:
+        /// 
+        /// - greater : products with price greater than the specified value
+        /// - less : products with price less than the specified value
+        /// - equal   : products with price equal to the specified value
+        /// 
+        /// Example:
+        /// GET /products/filter/price?price=100&criterion=greater&pageNumber=1&pageSize=5
+        /// </summary>
+        /// <param name="productFilterParams">
+        /// Object containing:
+        /// 
+        /// - Filtering parameters
+        /// - Pagination parameters
+        /// </param>
+        /// <returns>
+        /// A paginated collection of filtered ProductDto objects
+        /// including pagination metadata in the response headers.
+        /// </returns>
+        [HttpGet("filter/price")]
+        public ActionResult<IEnumerable<ProductDto>> GetProductsByPrice(
+            [FromQuery] ProductFilterParams productFilterParams)
+        {
+            // Retrieves filtered and paginated products
+            // based on the provided filter parameters
+            var pagedList =
+                _uof.RepositoryProducts
+                    .GetProductsByPriceFilter(productFilterParams);
+
+            // Sends pagination metadata in the response header
+            // and returns the paginated DTO collection
+            return AddPaginationHeader(pagedList);
         }
 
         /// <summary>
