@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using Criando_Minha_Primeira_API.DTOs;
 using Criando_Minha_Primeira_API.Model;
+using Criando_Minha_Primeira_API.Pagination;
 using Criando_Minha_Primeira_API.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Criando_Minha_Primeira_API.Controllers
 {
@@ -104,6 +106,84 @@ namespace Criando_Minha_Primeira_API.Controllers
             var productDto = _mapper.Map<ProductDto>(product);
 
             return Ok(productDto);
+        }
+
+        /// <summary>
+        /// Retrieves products using pagination.
+        /// 
+        /// Pagination parameters are received through the query string,
+        /// allowing clients to define the current page number
+        /// and the number of items returned per page.
+        /// 
+        /// Example:
+        /// GET /products?pageNumber=1&pageSize=10
+        /// </summary>
+        /// <param name="queryParams">
+        /// Object containing pagination parameters received from the URL query string.
+        /// 
+        /// PageNumber:
+        /// Defines which page should be returned.
+        /// 
+        /// PageSize:
+        /// Defines how many records should be returned per page.
+        /// </param>
+        /// <returns>
+        /// A paginated collection of ProductDto objects.
+        /// 
+        /// Pagination metadata is also included in the response headers
+        /// using the custom "X-Pagination" header.
+        /// </returns>
+        [HttpGet("pagination", Name = "PaginationProducts")]
+        public ActionResult<IEnumerable<ProductDto>> Pagination([FromQuery] QueryParams queryParams)
+        {
+            // Retrieves all products ordered by Id
+            var items = _uof.RepositoryProducts
+                             .GetAll()
+                             .OrderBy(p => p.Id);
+
+            // Creates a paginated list based on
+            // the requested page number and page size
+            var pagedList = PagedList<Product>.ToPagedList(
+                items,
+                queryParams.PageNumber,
+                queryParams.PageSize
+            );
+
+            // Maps Product entities to ProductDto objects
+            var pagedListDto = _mapper.Map<IEnumerable<ProductDto>>(pagedList);
+
+            // Creates pagination metadata object
+            // to provide additional information to the client
+            var metadata = new
+            {
+                // Current page being returned
+                pagedList.CurrentPage,
+
+                // Number of items returned per page
+                pagedList.PageSize,
+
+                // Total number of records available
+                pagedList.TotalCount,
+
+                // Total number of available pages
+                pagedList.TotalPages,
+
+                // Indicates whether a next page exists
+                pagedList.HasNext,
+
+                // Indicates whether a previous page exists
+                pagedList.HasPrevious,
+            };
+
+            // Adds pagination metadata to the response headers
+            // as a serialized JSON string
+            Response.Headers.Append(
+                "X-Pagination",
+                JsonSerializer.Serialize(metadata)
+            );
+
+            // Returns the paginated DTO collection
+            return Ok(pagedListDto);
         }
 
         /// <summary>

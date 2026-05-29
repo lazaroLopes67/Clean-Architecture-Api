@@ -1,8 +1,10 @@
 using AutoMapper;
 using Criando_Minha_Primeira_API.DTOs;
 using Criando_Minha_Primeira_API.Model;
+using Criando_Minha_Primeira_API.Pagination;
 using Criando_Minha_Primeira_API.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Criando_Minha_Primeira_API.Controllers
 {
@@ -104,6 +106,85 @@ namespace Criando_Minha_Primeira_API.Controllers
             var categoryDto = _mapper.Map<CategoryDto>(category);
 
             return Ok(categoryDto);
+        }
+
+
+        /// <summary>
+        /// Retrieves categories using pagination.
+        /// 
+        /// Pagination parameters are received through the query string,
+        /// allowing clients to define the current page number
+        /// and the number of items returned per page.
+        /// 
+        /// Example:
+        /// GET /categories/pagination?pageNumber=1&pageSize=10
+        /// </summary>
+        /// <param name="queryParams">
+        /// Object containing pagination parameters received from the URL query string.
+        /// 
+        /// PageNumber:
+        /// Defines which page should be returned.
+        /// 
+        /// PageSize:
+        /// Defines how many records should be returned per page.
+        /// </param>
+        /// <returns>
+        /// A paginated collection of CategoryDto objects.
+        /// 
+        /// Pagination metadata is also included in the response headers
+        /// using the "X-Pagination" custom header.
+        /// </returns>
+        [HttpGet("pagination", Name = "PaginationCategories")]
+        public ActionResult<IEnumerable<CategoryDto>> Pagination([FromQuery] QueryParams queryParams)
+        {
+            // Retrieves all categories ordered by Id
+            var items = _uof.RepositoryCategory
+                             .GetAll()
+                             .OrderBy(c => c.Id);
+
+            // Creates a paginated list based on
+            // the requested page number and page size
+            var pagedList = PagedList<Category>.ToPagedList(
+                items,
+                queryParams.PageNumber,
+                queryParams.PageSize
+            );
+
+            // Maps Category entities to CategoryDto objects
+            var pagedListDto = _mapper.Map<IEnumerable<CategoryDto>>(pagedList);
+
+            // Creates pagination metadata object
+            // to provide additional information to the client
+            var metadata = new
+            {
+                // Current page being returned
+                pagedList.CurrentPage,
+
+                // Number of items per page
+                pagedList.PageSize,
+
+                // Total number of records available
+                pagedList.TotalCount,
+
+                // Total number of pages available
+                pagedList.TotalPages,
+
+                // Indicates whether a next page exists
+                pagedList.HasNext,
+
+                // Indicates whether a previous page exists
+                pagedList.HasPrevious,
+            };
+
+            // Adds pagination metadata to the response headers
+            // as a serialized JSON string
+            Response.Headers.Append(
+                "X-Pagination",
+                JsonSerializer.Serialize(metadata)
+            );
+
+            // Returns the paginated DTO collection
+            return Ok(pagedListDto);
         }
 
         /// <summary>
