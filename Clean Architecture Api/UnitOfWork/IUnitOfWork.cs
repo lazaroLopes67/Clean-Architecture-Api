@@ -16,12 +16,13 @@ namespace Criando_Minha_Primeira_API.UnitOfWork
     public interface IUnitOfWork
     {
         /// <summary>
-        /// Provides access to the generic Category repository.
+        /// Provides access to the specialized Category repository.
         /// 
-        /// Used to perform CRUD operations
-        /// related to Category entities.
+        /// In addition to generic CRUD operations,
+        /// this repository also contains Category-specific features
+        /// such as filtering and pagination.
         /// </summary>
-        IRepository<Category> RepositoryCategory { get; }
+        ICategoryRepository RepositoryCategory { get; }
 
         /// <summary>
         /// Provides access to the specialized Product repository.

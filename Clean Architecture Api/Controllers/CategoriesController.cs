@@ -188,6 +188,93 @@ namespace Criando_Minha_Primeira_API.Controllers
         }
 
         /// <summary>
+        /// Retrieves categories filtered by name using pagination.
+        /// 
+        /// The filter value is received through query string parameters,
+        /// allowing clients to search categories by name while also
+        /// controlling pagination settings.
+        /// 
+        /// Example:
+        /// GET /categories/filter/name?name=electronics&pageNumber=1&pageSize=5
+        /// </summary>
+        /// <param name="categoryFilterParams">
+        /// Object containing:
+        /// 
+        /// - Name filter parameters
+        /// - Pagination parameters
+        /// </param>
+        /// <returns>
+        /// A paginated collection of CategoryDto objects
+        /// including pagination metadata in the response headers.
+        /// </returns>
+        [HttpGet("filter/name", Name = "GetCategoriesByName")]
+        public ActionResult<IEnumerable<CategoryDto>> GetCategoriesByName(
+            [FromQuery] CategoryFilterParams categoryFilterParams)
+        {
+            // Retrieves filtered and paginated categories
+            // based on the provided filter parameters
+            var pagedList =
+                _uof.RepositoryCategory
+                    .GetCategoriesByNameFilter(categoryFilterParams);
+
+            // Sends pagination metadata in the response header
+            // and returns the paginated DTO collection
+            return AddPaginationHeader(pagedList);
+        }
+        /// <summary>
+        /// Adds pagination metadata to the HTTP response headers
+        /// and returns the paginated DTO collection.
+        /// 
+        /// The metadata is serialized as JSON and stored
+        /// in the custom "X-Pagination" response header.
+        /// </summary>
+        /// <param name="pagedList">
+        /// Paginated collection containing Category entities
+        /// and pagination metadata.
+        /// </param>
+        /// <returns>
+        /// A paginated 
+        private ActionResult<IEnumerable<CategoryDto>> AddPaginationHeader(PagedList<Category> pagedList)
+        {
+            // Creates an anonymous object containing
+            // pagination metadata information
+            var metadata = new
+            {
+                // Current page being returned
+                pagedList.CurrentPage,
+
+                // Number of items returned per page
+                pagedList.PageSize,
+
+                // Total number of records available
+                pagedList.TotalCount,
+
+                // Total number of available pages
+                pagedList.TotalPages,
+
+                // Indicates whether a next page exists
+                pagedList.HasNext,
+
+                // Indicates whether a previous page exists
+                pagedList.HasPrevious,
+            };
+
+            // Adds pagination metadata to the response headers
+            // as a serialized JSON string
+            Response.Headers.Append(
+                "X-Pagination",
+                JsonSerializer.Serialize(metadata)
+            );
+
+            // Maps Category entities to CategoryDto objects
+            var pagedListDto =
+                _mapper.Map<IEnumerable<CategoryDto>>(pagedList);
+
+            // Returns the paginated DTO collection
+            return Ok(pagedListDto);
+        }
+
+        /// <summary>
         /// Creates a new category resource.
         /// </summary>
         /// <param name="categoryDto">

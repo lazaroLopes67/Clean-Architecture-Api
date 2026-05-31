@@ -127,7 +127,7 @@ namespace Criando_Minha_Primeira_API.Controllers
         /// A paginated collection of ProductDto objects
         /// including pagination metadata in the response headers.
         /// </returns>
-        [HttpGet]
+        [HttpGet("pagination")]
         public ActionResult<IEnumerable<ProductDto>> Pagination([FromQuery] QueryParams queryParams)
         {
             // Retrieves all products ordered by Id

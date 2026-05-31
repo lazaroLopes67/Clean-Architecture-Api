@@ -42,7 +42,7 @@ namespace Criando_Minha_Primeira_API.UnitOfWork
         /// The repository instance is only created
         /// when accessed for the first time.
         /// </summary>
-        private IRepository<Category>? _repositoryCategory;
+        private ICategoryRepository? _repositoryCategory;
 
         /// <summary>
         /// Lazy-initialized repository for Product entities.
@@ -57,17 +57,20 @@ namespace Criando_Minha_Primeira_API.UnitOfWork
         private IProductRepository? _repositoryProducts;
 
         /// <summary>
-        /// Provides access to the generic Category repository.
+        /// Provides access to the specialized Category repository.
         /// 
         /// If the repository has not been instantiated yet,
-        /// a new Repository<Category> instance is created.
+        /// a new CategoryRepository instance is created.
+        /// 
+        /// This repository supports Category-specific operations,
+        /// including custom filtering and pagination methods.
         /// </summary>
-        public IRepository<Category> RepositoryCategory
+        public ICategoryRepository RepositoryCategory
         {
             get
             {
                 return _repositoryCategory ??=
-                    new Repository<Category>(_context);
+                    new CategoryRepository(_context);
             }
         }
 
